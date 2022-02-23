@@ -3,11 +3,21 @@
 import diff_match_patch
 
 public struct Difference {
-    public let operation: DiffOperation
+    public enum Operation {
+        case equal
+        case insert
+        case delete
+    }
+    public let operation: Operation
     public let text: String
 
     init(diff: Diff) {
-        self.operation = diff.operation
+        switch diff.operation {
+        case .equal: self.operation = .equal
+        case .insert: self.operation = .insert
+        case .delete: self.operation = .delete
+        @unknown default: self.operation = .equal
+        }
         self.text = diff.text
     }
 }
