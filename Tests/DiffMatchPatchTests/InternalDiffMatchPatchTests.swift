@@ -102,7 +102,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 
     func test_diff_linesToChars() {
         let dmp = DiffMatchPatch()
-        var result = [AnyObject]()
+        var result = [Any]()
 
         // Convert lines down to characters.
         var tmpVector = ["", "alpha\n", "beta\n"]
@@ -135,7 +135,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
             chars += String(format: "%C", x)
         }
         XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
-        XCTAssertEqual(n, chars.characters.count, "More than 256 #2.")
+        XCTAssertEqual(n, chars.count, "More than 256 #2.")
         tmpVector.insert("", at: 0)
 
         result = dmp.diff_linesToChars(forFirstString: lines, andSecondString:"")
@@ -172,7 +172,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
             chars += String(format: "%C", x)
         }    
         XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
-        XCTAssertEqual(n, chars.characters.count, "More than 256 #2.")
+        XCTAssertEqual(n, chars.count, "More than 256 #2.")
         tmpVector.insert("", at: 0)
         diffs = [Diff(operation: .diffDelete, andText: chars)]
         dmp.diff_chars(diffs, toLines: tmpVector)
@@ -752,7 +752,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
             Diff(operation:.diffEqual, andText:"a"),
             Diff(operation:.diffDelete, andText:"t"),
             Diff(operation:.diffInsert, andText:"p")
-        ]
+        ] as NSArray
         XCTAssertEqual(diffs, dmp.diff_bisect(ofOldString: a, andNewString: b, deadline: Date.distantFuture.timeIntervalSinceReferenceDate), "Bisect test.")
 
         // Timeout.
