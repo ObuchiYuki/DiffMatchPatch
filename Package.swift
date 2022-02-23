@@ -10,6 +10,6 @@ let package = Package(
     targets: [
         .target(name: "diff_match_patch"),
         .target(name: "DiffMatchPatch", dependencies:["diff_match_patch"]),
-//        .testTarget(name: "DiffMatchPatchTests", dependencies: ["DiffMatchPatch"])
+        .testTarget(name: "DiffMatchPatchTests", dependencies: ["DiffMatchPatch"])
     ]
 )
