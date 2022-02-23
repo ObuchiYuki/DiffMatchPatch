@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "DiffMatchPatch",
     products: [
-        .library(name: "DiffMatchPatch", type: .static, targets: ["diff_match_patch"])
+        .library(name: "DiffMatchPatch", type: .static, targets: ["DiffMatchPatch"])
     ],
     targets: [
         .target(name: "diff_match_patch"),
