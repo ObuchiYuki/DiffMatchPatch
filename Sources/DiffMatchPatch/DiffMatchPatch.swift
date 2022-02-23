@@ -33,10 +33,10 @@ extension DiffOperation: CustomStringConvertible {
     }
 }
 
-public enum TextCheckOperation {
-    case characters
-    case words
-    case lines
+public enum TextCheckOperation: String {
+    case characters = "characters"
+    case words = "words"
+    case lines = "lines"
 }
 
 public enum TextDifferenceChecker {
