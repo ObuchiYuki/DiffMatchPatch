@@ -21,13 +21,15 @@
  */
 
 #import "NSString+UnicharUtilities.h"
+#import "JXArcCompatibilityMacros.h"
 
 
 @implementation NSString (UnicharUtilities)
 
 + (NSString *)diff_stringFromUnichar:(unichar)ch;
 {
-    return [[NSString alloc] initWithCharacters:&ch length: 1];
+  CFStringRef c = CFStringCreateWithCharacters(kCFAllocatorDefault, &ch, 1);
+  return JX_TRANSFER_CF_TO_OBJC(NSString *, c);
 }
 
 - (NSString *)diff_substringWithCharacterAtIndex:(NSUInteger)anIndex;

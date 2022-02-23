@@ -1,810 +1,810 @@
-// This file was originally called 'DiffMatchPathTest.m' when it was part of
-// the Objective-C version of diffmatchpatch. The tests have been translated to
-// Swift so they can be run with SPM.
-
-import XCTest
-@testable import diff_match_patch
-
-
-class InternalDiffMatchPatchTests: XCTestCase {
-
-    func test_diff_commonPrefix() {
-        let dmp = DiffMatchPatch()
-
-        // Detect any common suffix.
-        // Null case.
-        XCTAssertEqual(0, dmp.diff_commonPrefix(ofFirstString: "abc", andSecondString: "xyz"), "Common suffix null case failed.")
-
-        // Non-null case.
-        XCTAssertEqual(4, dmp.diff_commonPrefix(ofFirstString: "1234abcdef", andSecondString: "1234xyz"), "Common suffix non-null case failed.")
-
-        // Whole case.
-        XCTAssertEqual(4, dmp.diff_commonPrefix(ofFirstString: "1234", andSecondString: "1234xyz"), "Common suffix whole case failed.")
-    }
-
-    func test_diff_commonSuffix() {
-        let dmp = DiffMatchPatch()
-
-        // Detect any common suffix.
-        // Null case.
-        XCTAssertEqual(0, dmp.diff_commonSuffix(ofFirstString: "abc", andSecondString:"xyz"), "Detect any common suffix. Null case.")
-
-        // Non-null case.
-        XCTAssertEqual(4, dmp.diff_commonSuffix(ofFirstString: "abcdef1234", andSecondString:"xyz1234"), "Detect any common suffix. Non-null case.")
-
-        // Whole case.
-        XCTAssertEqual(4, dmp.diff_commonSuffix(ofFirstString: "1234", andSecondString:"xyz1234"), "Detect any common suffix. Whole case.")
-    }
-
-    func test_diff_commonOverlap() {
-        let dmp = DiffMatchPatch()
-
-        // Detect any suffix/prefix overlap.
-        // Null case.
-        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "", andSecondString:"abcd"), "Detect any suffix/prefix overlap. Null case.")
-
-        // Whole case.
-        XCTAssertEqual(3, dmp.diff_commonOverlap(ofFirstString: "abc", andSecondString:"abcd"), "Detect any suffix/prefix overlap. Whole case.")
-
-        // No overlap.
-        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "123456", andSecondString:"abcd"), "Detect any suffix/prefix overlap. No overlap.")
-
-        // Overlap.
-        XCTAssertEqual(3, dmp.diff_commonOverlap(ofFirstString: "123456xxx", andSecondString:"xxxabcd"), "Detect any suffix/prefix overlap. Overlap.")
-
-        // Unicode.
-        // Some overly clever languages (C#) may treat ligatures as equal to their
-        // component letters.  E.g. U+FB01 == 'fi'
-        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "fi", andSecondString:"\u{0000fb01}i"), "Detect any suffix/prefix overlap. Unicode.")
-    }
-
-    func test_diff_halfmatch() {
-        let dmp = DiffMatchPatch()
-        dmp.diff_Timeout = 1
-
-        // No match.
-        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "1234567890", andSecondString:"abcdef").count, 0, "No match #1.")
-
-        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "12345", andSecondString:"23").count, 0, "No match #2.")
-
-        // Single Match.
-        var expectedResult = ["12", "90", "a", "z", "345678"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "1234567890", andSecondString:"a345678z") as! [String], "Single Match #1.")
-
-        expectedResult = ["a", "z", "12", "90", "345678"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "a345678z", andSecondString:"1234567890") as! [String], "Single Match #2.")
-
-        expectedResult = ["abc", "z", "1234", "0", "56789"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "abc56789z", andSecondString:"1234567890") as! [String], "Single Match #3.")
-
-        expectedResult = ["a", "xyz", "1", "7890", "23456"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "a23456xyz", andSecondString:"1234567890") as! [String], "Single Match #4.")
-
-        // Multiple Matches.
-        expectedResult = ["12123", "123121", "a", "z", "1234123451234"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "121231234123451234123121", andSecondString:"a1234123451234z") as! [String], "Multiple Matches #1.")
-
-        expectedResult = ["", "-=-=-=-=-=", "x", "", "x-=-=-=-=-=-=-="]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "x-=-=-=-=-=-=-=-=-=-=-=-=", andSecondString:"xx-=-=-=-=-=-=-=") as! [String], "Multiple Matches #2.")
-
-        expectedResult = ["-=-=-=-=-=", "", "", "y", "-=-=-=-=-=-=-=y"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "-=-=-=-=-=-=-=-=-=-=-=-=y", andSecondString:"-=-=-=-=-=-=-=yy") as! [String], "Multiple Matches #3.")
-
-        // Non-optimal halfmatch.
-        // Optimal diff would be -q+x=H-i+e=lloHe+Hu=llo-Hew+y not -qHillo+x=HelloHe-w+Hulloy
-        expectedResult = ["qHillo", "w", "x", "Hulloy", "HelloHe"]
-        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "qHilloHelloHew", andSecondString:"xHelloHeHulloy") as! [String], "Non-optimal halfmatch.")
-
-        // Optimal no halfmatch.
-        dmp.diff_Timeout = 0
-        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "qHilloHelloHew", andSecondString:"xHelloHeHulloy").count, 0, "Optimal no halfmatch.")
-    }
-
-    func test_diff_linesToChars() {
-        let dmp = DiffMatchPatch()
-        var result = [Any]()
-
-        // Convert lines down to characters.
-        var tmpVector = ["", "alpha\n", "beta\n"]
-        result = dmp.diff_linesToChars(forFirstString: "alpha\nbeta\nalpha\n", andSecondString:"beta\nalpha\nbeta\n")
-        XCTAssertEqual("\u{01}\u{02}\u{01}", result[0] as? String, "Shared lines #1.")
-        XCTAssertEqual("\u{02}\u{01}\u{02}", result[1] as? String, "Shared lines #2.")
-        XCTAssertEqual(tmpVector, result[2] as! [String], "Shared lines #3.")
-
-        tmpVector = ["", "alpha\r\n", "beta\r\n", "\r\n"]
-        result = dmp.diff_linesToChars(forFirstString: "", andSecondString:"alpha\r\nbeta\r\n\r\n\r\n")
-        XCTAssertEqual("", result[0] as? String, "Empty string and blank lines #1.")
-        XCTAssertEqual("\u{01}\u{02}\u{03}\u{03}", result[1] as? String, "Empty string and blank lines #2.")
-        XCTAssertEqual(tmpVector, result[2] as! [String], "Empty string and blank lines #3.")
-
-        tmpVector = ["", "a", "b"]
-        result = dmp.diff_linesToChars(forFirstString: "a", andSecondString:"b")
-        XCTAssertEqual("\u{01}", result[0] as? String, "No linebreaks #1.")
-        XCTAssertEqual("\u{02}", result[1] as? String, "No linebreaks #2.")
-        XCTAssertEqual(tmpVector, result[2] as! [String], "No linebreaks #3.")
-
-        // More than 256 to reveal any 8-bit limitations.
-        let n = 300
-        tmpVector = []
-        var lines = ""
-        var chars = ""
-        for x in 1...n {
-            let currentLine = "\(x)\n"
-            tmpVector.append(currentLine)
-            lines += currentLine
-            chars += String(format: "%C", x)
-        }
-        XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
-        XCTAssertEqual(n, chars.count, "More than 256 #2.")
-        tmpVector.insert("", at: 0)
-
-        result = dmp.diff_linesToChars(forFirstString: lines, andSecondString:"")
-        XCTAssertEqual(chars, result[0] as? String, "More than 256 #3.")
-        XCTAssertEqual("", result[1] as? String, "More than 256 #4.")
-        XCTAssertEqual(tmpVector, result[2] as! [String], "More than 256 #5.")
-    }
-
-    func test_diff_charsToLines() {
-        let dmp = DiffMatchPatch()
-
-        // Convert chars up to lines.
-        var diffs = [
-            Diff(operation: .diffEqual, andText: "\u{01}\u{02}\u{01}"),
-            Diff(operation: .diffInsert, andText: "\u{02}\u{01}\u{02}")
-        ]
-        var tmpVector = ["", "alpha\n", "beta\n"]
-        dmp.diff_chars(diffs, toLines: tmpVector)
-        let expectedResult = [
-            Diff(operation: .diffEqual, andText: "alpha\nbeta\nalpha\n"),
-            Diff(operation: .diffInsert, andText: "beta\nalpha\nbeta\n")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "Shared lines.")
-
-        // More than 256 to reveal any 8-bit limitations.
-        let n = 300
-        tmpVector = []
-        var lines = ""
-        var chars = ""
-        for x in 1...n {
-            let currentLine = String(format: "%d\n", x)
-            tmpVector.append(currentLine)
-            lines += currentLine
-            chars += String(format: "%C", x)
-        }    
-        XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
-        XCTAssertEqual(n, chars.count, "More than 256 #2.")
-        tmpVector.insert("", at: 0)
-        diffs = [Diff(operation: .diffDelete, andText: chars)]
-        dmp.diff_chars(diffs, toLines: tmpVector)
-        XCTAssertEqual([Diff(operation: .diffDelete, andText: lines)], diffs, "More than 256 #3.")
-    }
-
-    func test_diff_cleanupMerge() {
-        let dmp = DiffMatchPatch()
-
-        // Cleanup a messy diff.
-        // Null case.
-        XCTAssertEqual([Diff](), dmp.diff_cleanupMerge([Diff]()), "Null case.")
-
-        // No change case.
-        var diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"b"), Diff(operation:.diffInsert, andText:"c")]
-        var expectedResult = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"b"), Diff(operation:.diffInsert, andText:"c")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "No change case.")
-
-        // Merge equalities.
-        diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffEqual, andText:"b"), Diff(operation:.diffEqual, andText:"c")]
-        expectedResult = [Diff(operation:.diffEqual, andText:"abc")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge equalities.")
-
-        // Merge deletions.
-        diffs = [Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffDelete, andText:"b"), Diff(operation:.diffDelete, andText:"c")]
-        expectedResult = [Diff(operation:.diffDelete, andText:"abc")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge deletions.")
-
-        // Merge insertions.
-        diffs = [Diff(operation:.diffInsert, andText:"a"), Diff(operation:.diffInsert, andText:"b"), Diff(operation:.diffInsert, andText:"c")]
-        expectedResult = [Diff(operation:.diffInsert, andText:"abc")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge insertions.")
-
-        // Merge interweave.
-        diffs = [Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffInsert, andText:"b"), Diff(operation:.diffDelete, andText:"c"), Diff(operation:.diffInsert, andText:"d"), Diff(operation:.diffEqual, andText:"e"), Diff(operation:.diffEqual, andText:"f")]
-        expectedResult = [Diff(operation:.diffDelete, andText:"ac"), Diff(operation:.diffInsert, andText:"bd"), Diff(operation:.diffEqual, andText:"ef")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge interweave.")
-
-        // Prefix and suffix detection.
-        diffs = [Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffInsert, andText:"abc"), Diff(operation:.diffDelete, andText:"dc")]
-        expectedResult = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"d"), Diff(operation:.diffInsert, andText:"b"), Diff(operation:.diffEqual, andText:"c")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Prefix and suffix detection.")
-
-        // Prefix and suffix detection with equalities.
-        diffs = [Diff(operation:.diffEqual, andText:"x"), Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffInsert, andText:"abc"), Diff(operation:.diffDelete, andText:"dc"), Diff(operation:.diffEqual, andText:"y")]
-        expectedResult = [Diff(operation:.diffEqual, andText:"xa"), Diff(operation:.diffDelete, andText:"d"), Diff(operation:.diffInsert, andText:"b"), Diff(operation:.diffEqual, andText:"cy")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Prefix and suffix detection with equalities.")
-
-        // Slide edit left.
-        diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffInsert, andText:"ba"), Diff(operation:.diffEqual, andText:"c")]
-        expectedResult = [Diff(operation:.diffInsert, andText:"ab"), Diff(operation:.diffEqual, andText:"ac")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit left.")
-
-        // Slide edit right.
-        diffs = [Diff(operation:.diffEqual, andText:"c"), Diff(operation:.diffInsert, andText:"ab"), Diff(operation:.diffEqual, andText:"a")]
-        expectedResult = [Diff(operation:.diffEqual, andText:"ca"), Diff(operation:.diffInsert, andText:"ba")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit right.")
-
-        // Slide edit left recursive.
-        diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"b"), Diff(operation:.diffEqual, andText:"c"), Diff(operation:.diffDelete, andText:"ac"), Diff(operation:.diffEqual, andText:"x")]
-        expectedResult = [Diff(operation:.diffDelete, andText:"abc"), Diff(operation:.diffEqual, andText:"acx")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit left recursive.")
-
-        // Slide edit right recursive.
-        diffs = [Diff(operation:.diffEqual, andText:"x"), Diff(operation:.diffDelete, andText:"ca"), Diff(operation:.diffEqual, andText:"c"), Diff(operation:.diffDelete, andText:"b"), Diff(operation:.diffEqual, andText:"a")]
-        expectedResult = [Diff(operation:.diffEqual, andText:"xca"), Diff(operation:.diffDelete, andText:"cba")]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit right recursive.")
-    }
-
-    func test_diff_cleanupSemanticLossless() {
-        let dmp = DiffMatchPatch()
-
-        // Slide diffs to match logical boundaries.
-        // Null case.
-        XCTAssertEqual([Diff](), dmp.diff_cleanupSemanticLossless([Diff]()), "Null case.")
-
-        // Blank lines.
-        var diffs = [
-            Diff(operation:.diffEqual, andText:"AAA\r\n\r\nBBB"),
-            Diff(operation:.diffInsert, andText:"\r\nDDD\r\n\r\nBBB"),
-            Diff(operation:.diffEqual, andText:"\r\nEEE")
-        ]
-        var expectedResult = [
-            Diff(operation:.diffEqual, andText:"AAA\r\n\r\n"),
-            Diff(operation:.diffInsert, andText:"BBB\r\nDDD\r\n\r\n"),
-            Diff(operation:.diffEqual, andText:"BBB\r\nEEE")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Blank lines.")
-
-        // Line boundaries.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"AAA\r\nBBB"),
-            Diff(operation:.diffInsert, andText:" DDD\r\nBBB"),
-            Diff(operation:.diffEqual, andText:" EEE")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"AAA\r\n"),
-            Diff(operation:.diffInsert, andText:"BBB DDD\r\n"),
-            Diff(operation:.diffEqual, andText:"BBB EEE")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Line boundaries.")
-
-        // Word boundaries.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"The c"),
-            Diff(operation:.diffInsert, andText:"ow and the c"),
-            Diff(operation:.diffEqual, andText:"at.")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"The "),
-            Diff(operation:.diffInsert, andText:"cow and the "),
-            Diff(operation:.diffEqual, andText:"cat.")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Word boundaries.")
-
-        // Alphanumeric boundaries.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"The-c"),
-            Diff(operation:.diffInsert, andText:"ow-and-the-c"),
-            Diff(operation:.diffEqual, andText:"at.")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"The-"),
-            Diff(operation:.diffInsert, andText:"cow-and-the-"),
-            Diff(operation:.diffEqual, andText:"cat.")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Alphanumeric boundaries.")
-
-        // Hitting the start.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"a"),
-            Diff(operation:.diffDelete, andText:"a"),
-            Diff(operation:.diffEqual, andText:"ax")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"a"),
-            Diff(operation:.diffEqual, andText:"aax")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Hitting the start.")
-
-        // Hitting the end.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"xa"),
-            Diff(operation:.diffDelete, andText:"a"),
-            Diff(operation:.diffEqual, andText:"a")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"xaa"),
-            Diff(operation:.diffDelete, andText:"a")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Hitting the end.")
-
-        // Alphanumeric boundaries.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"The xxx. The "),
-            Diff(operation:.diffInsert, andText:"zzz. The "),
-            Diff(operation:.diffEqual, andText:"yyy.")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"The xxx."),
-            Diff(operation:.diffInsert, andText:" The zzz."),
-            Diff(operation:.diffEqual, andText:" The yyy.")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Sentence boundaries.")
-    }
-
-    func test_diff_cleanupSemantic() {
-        let dmp = DiffMatchPatch()
-
-        // Cleanup semantically trivial equalities.
-        // Null case.
-        XCTAssertEqual([Diff](), dmp.diff_cleanupSemantic([Diff]()), "Null case.")
-
-        // No elimination #1.
-        var diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"cd"),
-            Diff(operation:.diffEqual, andText:"12"),
-            Diff(operation:.diffDelete, andText:"e")
-        ]
-        var expectedResult = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"cd"),
-            Diff(operation:.diffEqual, andText:"12"),
-            Diff(operation:.diffDelete, andText:"e")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No elimination #1.")
-
-        // No elimination #2.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffInsert, andText:"ABC"),
-            Diff(operation:.diffEqual, andText:"1234"),
-            Diff(operation:.diffDelete, andText:"wxyz")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffInsert, andText:"ABC"),
-            Diff(operation:.diffEqual, andText:"1234"),
-            Diff(operation:.diffDelete, andText:"wxyz")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No elimination #2.")
-
-        // Simple elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"a"),
-            Diff(operation:.diffEqual, andText:"b"),
-            Diff(operation:.diffDelete, andText:"c")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffInsert, andText:"b")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Simple elimination.")
-
-        // Backpass elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffEqual, andText:"cd"),
-            Diff(operation:.diffDelete, andText:"e"),
-            Diff(operation:.diffEqual, andText:"f"),
-            Diff(operation:.diffInsert, andText:"g")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abcdef"),
-            Diff(operation:.diffInsert, andText:"cdfg")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Backpass elimination.")
-
-        // Multiple eliminations.
-        diffs = [
-            Diff(operation:.diffInsert, andText:"1"),
-            Diff(operation:.diffEqual, andText:"A"),
-            Diff(operation:.diffDelete, andText:"B"),
-            Diff(operation:.diffInsert, andText:"2"),
-            Diff(operation:.diffEqual, andText:"_"),
-            Diff(operation:.diffInsert, andText:"1"),
-            Diff(operation:.diffEqual, andText:"A"),
-            Diff(operation:.diffDelete, andText:"B"),
-            Diff(operation:.diffInsert, andText:"2")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"AB_AB"),
-            Diff(operation:.diffInsert, andText:"1A2_1A2")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Multiple eliminations.")
-
-        // Word boundaries.
-        diffs = [
-            Diff(operation:.diffEqual, andText:"The c"),
-            Diff(operation:.diffDelete, andText:"ow and the c"),
-            Diff(operation:.diffEqual, andText:"at.")
-        ]
-        expectedResult = [
-            Diff(operation:.diffEqual, andText:"The "),
-            Diff(operation:.diffDelete, andText:"cow and the "),
-            Diff(operation:.diffEqual, andText:"cat.")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Word boundaries.")
-
-        // No overlap elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"abcxx"),
-            Diff(operation:.diffInsert, andText:"xxdef")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abcxx"),
-            Diff(operation:.diffInsert, andText:"xxdef")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No overlap elimination.")
-
-        // Overlap elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"abcxxx"),
-            Diff(operation:.diffInsert, andText:"xxxdef")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffEqual, andText:"xxx"),
-            Diff(operation:.diffInsert, andText:"def")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Overlap elimination.")
-
-        // Reverse overlap elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"xxxabc"),
-            Diff(operation:.diffInsert, andText:"defxxx")
-        ]
-        expectedResult = [
-            Diff(operation:.diffInsert, andText:"def"),
-            Diff(operation:.diffEqual, andText:"xxx"),
-            Diff(operation:.diffDelete, andText:"abc")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Reverse overlap elimination.")
-
-        // Two overlap eliminations.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"abcd1212"),
-            Diff(operation:.diffInsert, andText:"1212efghi"),
-            Diff(operation:.diffEqual, andText:"----"),
-            Diff(operation:.diffDelete, andText:"A3"),
-            Diff(operation:.diffInsert, andText:"3BC")
-        ]
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abcd"),
-            Diff(operation:.diffEqual, andText:"1212"),
-            Diff(operation:.diffInsert, andText:"efghi"),
-            Diff(operation:.diffEqual, andText:"----"),
-            Diff(operation:.diffDelete, andText:"A"),
-            Diff(operation:.diffEqual, andText:"3"),
-            Diff(operation:.diffInsert, andText:"BC")
-        ]
-        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Two overlap eliminations.")
-    }
-
-    func test_diff_cleanupEfficiency() {
-        let dmp = DiffMatchPatch()
-
-        // Cleanup operationally trivial equalities.
-        dmp.diff_EditCost = 4;
-        // Null case.
-        var diffs = dmp.diff_cleanupEfficiency([Diff]())
-        XCTAssertEqual([Diff](), diffs, "Null case.")
-
-        // No elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"wxyz"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"34")
-        ]
-        diffs = dmp.diff_cleanupEfficiency(diffs)
-        var expectedResult = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"wxyz"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"34")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "No elimination.")
-
-        // Four-edit elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"xyz"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"34")
-        ]
-        diffs = dmp.diff_cleanupEfficiency(diffs)
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abxyzcd"),
-            Diff(operation:.diffInsert, andText:"12xyz34")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "Four-edit elimination.")
-
-        // Three-edit elimination.
-        diffs = [
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"x"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"34")
-        ]
-        diffs = dmp.diff_cleanupEfficiency(diffs)
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"xcd"),
-            Diff(operation:.diffInsert, andText:"12x34")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "Three-edit elimination.")
-
-        // Backpass elimination.
-        diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"xy"),
-            Diff(operation:.diffInsert, andText:"34"),
-            Diff(operation:.diffEqual, andText:"z"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"56")
-        ]
-        diffs = dmp.diff_cleanupEfficiency(diffs)
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abxyzcd"),
-            Diff(operation:.diffInsert, andText:"12xy34z56")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "Backpass elimination.")
-
-        // High cost elimination.
-        dmp.diff_EditCost = 5;
-        diffs = [
-            Diff(operation:.diffDelete, andText:"ab"),
-            Diff(operation:.diffInsert, andText:"12"),
-            Diff(operation:.diffEqual, andText:"wxyz"),
-            Diff(operation:.diffDelete, andText:"cd"),
-            Diff(operation:.diffInsert, andText:"34")
-        ]
-        diffs = dmp.diff_cleanupEfficiency(diffs)
-        expectedResult = [
-            Diff(operation:.diffDelete, andText:"abwxyzcd"),
-            Diff(operation:.diffInsert, andText:"12wxyz34")
-        ]
-        XCTAssertEqual(expectedResult, diffs, "High cost elimination.")
-    }
-
-    func test_diff_prettyHtml() {
-        let dmp = DiffMatchPatch()
-
-        // Pretty print.
-        let diffs = [
-            Diff(operation:.diffEqual, andText:"a\n"),
-            Diff(operation:.diffDelete, andText:"<B>b</B>"),
-            Diff(operation:.diffInsert, andText:"c&d")
-        ]
-        let expectedResult = "<span>a&para;<br></span><del style=\"background:#ffe6e6;\">&lt;B&gt;b&lt;/B&gt;</del><ins style=\"background:#e6ffe6;\">c&amp;d</ins>";
-        XCTAssertEqual(expectedResult, dmp.diff_prettyHtml(diffs), "Pretty print.")
-    }
-
-    func test_diff_text() {
-        let dmp = DiffMatchPatch()
-
-        // Compute the source and destination texts.
-        let diffs = [
-            Diff(operation:.diffEqual, andText:"jump"),
-            Diff(operation:.diffDelete, andText:"s"),
-            Diff(operation:.diffInsert, andText:"ed"),
-            Diff(operation:.diffEqual, andText:" over "),
-            Diff(operation:.diffDelete, andText:"the"),
-            Diff(operation:.diffInsert, andText:"a"),
-            Diff(operation:.diffEqual, andText:" lazy")
-        ]
-        XCTAssertEqual("jumps over the lazy", dmp.diff_text1(diffs), "Compute the source and destination texts #1")
-        XCTAssertEqual("jumped over a lazy", dmp.diff_text2(diffs), "Compute the source and destination texts #2")
-    }
-
-    func test_diff_delta() {
-        let dmp = DiffMatchPatch()
-
-        // Convert a diff into delta string.
-        var diffs = [
-            Diff(operation:.diffEqual, andText:"jump"),
-            Diff(operation:.diffDelete, andText:"s"),
-            Diff(operation:.diffInsert, andText:"ed"),
-            Diff(operation:.diffEqual, andText:" over "),
-            Diff(operation:.diffDelete, andText:"the"),
-            Diff(operation:.diffInsert, andText:"a"),
-            Diff(operation:.diffEqual, andText:" lazy"),
-            Diff(operation:.diffInsert, andText:"old dog")
-        ]
-        var text1 = dmp.diff_text1(diffs)
-        XCTAssertEqual("jumps over the lazy", text1, "Convert a diff into delta string 1.")
-
-        var delta = dmp.diff_(toDelta: diffs)
-        XCTAssertEqual("=4\t-1\t+ed\t=6\t-3\t+a\t=5\t+old dog", delta, "Convert a diff into delta string 2.")
-
-        // Convert delta string into a diff.
-        XCTAssertEqual(diffs, try dmp.diff_fromDelta(withText: text1, andDelta: delta), "Convert delta string into a diff.")
-
-        // Generates error (19 < 20).
-        do {
-            try dmp.diff_fromDelta(withText: text1 + "x", andDelta: delta)
-            XCTFail("expected error")
-        } catch let err as NSError {
-            XCTAssertEqual(err.code, 103)
-            XCTAssertEqual(err.localizedDescription, "Delta length (19) smaller than source text length (20).")
-        } catch {
-            XCTFail("unexpected error type")
-        }
-
-        // Generates error (19 > 18).
-        do {
-            try dmp.diff_fromDelta(withText: text1.substring(from: text1.index(after: text1.startIndex)), andDelta:delta)
-            XCTFail("expected error")
-        } catch let err as NSError {
-            XCTAssertEqual(err.code, 102)
-            XCTAssertEqual(err.localizedDescription, "Delta length (19) larger than source text length (18).")
-        } catch {
-            XCTFail("unexpected error type")
-        }
-
-        // Generates error (%c3%xy invalid Unicode).
-        do {
-            try dmp.diff_fromDelta(withText:"", andDelta:"+%c3%xy")
-            XCTFail("expected error")
-        } catch let err as NSError {
-            XCTAssertEqual(err.code, 99)
-            XCTAssertEqual(err.localizedDescription, "Invalid character in diff_fromDelta: (null)")
-        } catch {
-            XCTFail("unexpected error type")
-        }
-
-        // Test deltas with special characters.
-        diffs = [
-            Diff(operation:.diffEqual, andText:String(format:"\u{00000680} %C \t %%", 0)),
-            Diff(operation:.diffDelete, andText:String(format:"\u{00000681} %C \n ^", 1)),
-            Diff(operation:.diffInsert, andText:String(format:"\u{00000682} %C \\ |", 2))
-        ]
-        text1 = dmp.diff_text1(diffs)
-        let expectedString = String(format:"\u{00000680} %C \t %%\u{00000681} %C \n ^", 0, 1)
-        XCTAssertEqual(expectedString, text1, "Test deltas with special characters.")
-
-        delta = dmp.diff_(toDelta: diffs)
-        // Upper case, because to CFURLCreateStringByAddingPercentEscapes() uses upper.
-        XCTAssertEqual("=7\t-7\t+%DA%82 %02 %5C %7C", delta, "diff_toDelta: Unicode 1.")
-
-        XCTAssertEqual(diffs, try! dmp.diff_fromDelta(withText:text1, andDelta:delta), "diff_fromDelta: Unicode 2.")
-
-        // Verify pool of unchanged characters.
-        diffs = [Diff(operation:.diffInsert, andText:"A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ")]
-        let text2 = dmp.diff_text2(diffs)
-        XCTAssertEqual("A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ", text2, "diff_text2: Unchanged characters 1.")
-
-        delta = dmp.diff_(toDelta: diffs)
-        XCTAssertEqual("+A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ", delta, "diff_toDelta: Unchanged characters 2.")
-
-        // Convert delta string into a diff.
-        let expectedResult = try! dmp.diff_fromDelta(withText:"", andDelta: delta)
-        XCTAssertEqual(diffs, expectedResult, "diff_fromDelta: Unchanged characters. Convert delta string into a diff.")
-    }
-
-    func test_diff_xIndex() {
-        let dmp = DiffMatchPatch()
-
-        // Translate a location in text1 to text2.
-        var diffs = [
-            Diff(operation:.diffDelete, andText:"a"),
-            Diff(operation:.diffInsert, andText:"1234"),
-            Diff(operation:.diffEqual, andText:"xyz")
-        ]
-        XCTAssertEqual(5, dmp.diff_xIndex(in: diffs, location:2), "diff_xIndex: Translation on equality. Translate a location in text1 to text2.")
-
-        diffs = [
-            Diff(operation:.diffEqual, andText:"a"),
-            Diff(operation:.diffDelete, andText:"1234"),
-            Diff(operation:.diffEqual, andText:"xyz")
-        ]
-        XCTAssertEqual(1, dmp.diff_xIndex(in: diffs, location:3), "diff_xIndex: Translation on deletion.")
-    }
-
-    func test_diff_levenshtein() {
-        let dmp = DiffMatchPatch()
-
-        var diffs = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffInsert, andText:"1234"),
-            Diff(operation:.diffEqual, andText:"xyz")
-        ]
-        XCTAssertEqual(4, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with trailing equality.")
-
-        diffs = [
-            Diff(operation:.diffEqual, andText:"xyz"),
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffInsert, andText:"1234")
-        ]
-        XCTAssertEqual(4, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with leading equality.")
-
-        diffs = [
-            Diff(operation:.diffDelete, andText:"abc"),
-            Diff(operation:.diffEqual, andText:"xyz"),
-            Diff(operation:.diffInsert, andText:"1234")
-        ]
-        XCTAssertEqual(7, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with middle equality.")
-    }
-
-    func diff_bisectTest() {
-        let dmp = DiffMatchPatch()
-
-        // Normal.
-        let a = "cat"
-        let b = "map"
-        // Since the resulting diff hasn't been normalized, it would be ok if
-        // the insertion and deletion pairs are swapped.
-        // If the order changes, tweak this test as required.
-        var diffs = [
-            Diff(operation:.diffDelete, andText:"c"),
-            Diff(operation:.diffInsert, andText:"m"),
-            Diff(operation:.diffEqual, andText:"a"),
-            Diff(operation:.diffDelete, andText:"t"),
-            Diff(operation:.diffInsert, andText:"p")
-        ] as NSArray
-        XCTAssertEqual(diffs, dmp.diff_bisect(ofOldString: a, andNewString: b, deadline: Date.distantFuture.timeIntervalSinceReferenceDate), "Bisect test.")
-
-        // Timeout.
-        diffs = [Diff(operation:.diffDelete, andText:"cat"), Diff(operation:.diffInsert, andText:"map")]
-        XCTAssertEqual(diffs, dmp.diff_bisect(ofOldString: a, andNewString:b, deadline:Date.distantFuture.timeIntervalSinceReferenceDate), "Bisect timeout.")
-    }
+//// This file was originally called 'DiffMatchPathTest.m' when it was part of
+//// the Objective-C version of diffmatchpatch. The tests have been translated to
+//// Swift so they can be run with SPM.
+//
+//import XCTest
+//@testable import diff_match_patch
+//
+//
+//class InternalDiffMatchPatchTests: XCTestCase {
+//
+//    func test_diff_commonPrefix() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Detect any common suffix.
+//        // Null case.
+//        XCTAssertEqual(0, dmp.diff_commonPrefix(ofFirstString: "abc", andSecondString: "xyz"), "Common suffix null case failed.")
+//
+//        // Non-null case.
+//        XCTAssertEqual(4, dmp.diff_commonPrefix(ofFirstString: "1234abcdef", andSecondString: "1234xyz"), "Common suffix non-null case failed.")
+//
+//        // Whole case.
+//        XCTAssertEqual(4, dmp.diff_commonPrefix(ofFirstString: "1234", andSecondString: "1234xyz"), "Common suffix whole case failed.")
+//    }
+//
+//    func test_diff_commonSuffix() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Detect any common suffix.
+//        // Null case.
+//        XCTAssertEqual(0, dmp.diff_commonSuffix(ofFirstString: "abc", andSecondString:"xyz"), "Detect any common suffix. Null case.")
+//
+//        // Non-null case.
+//        XCTAssertEqual(4, dmp.diff_commonSuffix(ofFirstString: "abcdef1234", andSecondString:"xyz1234"), "Detect any common suffix. Non-null case.")
+//
+//        // Whole case.
+//        XCTAssertEqual(4, dmp.diff_commonSuffix(ofFirstString: "1234", andSecondString:"xyz1234"), "Detect any common suffix. Whole case.")
+//    }
+//
+//    func test_diff_commonOverlap() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Detect any suffix/prefix overlap.
+//        // Null case.
+//        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "", andSecondString:"abcd"), "Detect any suffix/prefix overlap. Null case.")
+//
+//        // Whole case.
+//        XCTAssertEqual(3, dmp.diff_commonOverlap(ofFirstString: "abc", andSecondString:"abcd"), "Detect any suffix/prefix overlap. Whole case.")
+//
+//        // No overlap.
+//        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "123456", andSecondString:"abcd"), "Detect any suffix/prefix overlap. No overlap.")
+//
+//        // Overlap.
+//        XCTAssertEqual(3, dmp.diff_commonOverlap(ofFirstString: "123456xxx", andSecondString:"xxxabcd"), "Detect any suffix/prefix overlap. Overlap.")
+//
+//        // Unicode.
+//        // Some overly clever languages (C#) may treat ligatures as equal to their
+//        // component letters.  E.g. U+FB01 == 'fi'
+//        XCTAssertEqual(0, dmp.diff_commonOverlap(ofFirstString: "fi", andSecondString:"\u{0000fb01}i"), "Detect any suffix/prefix overlap. Unicode.")
+//    }
+//
+//    func test_diff_halfmatch() {
+//        let dmp = __DiffMatchPatch()
+//        dmp.diff_Timeout = 1
+//
+//        // No match.
+//        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "1234567890", andSecondString:"abcdef").count, 0, "No match #1.")
+//
+//        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "12345", andSecondString:"23").count, 0, "No match #2.")
+//
+//        // Single Match.
+//        var expectedResult = ["12", "90", "a", "z", "345678"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "1234567890", andSecondString:"a345678z") as! [String], "Single Match #1.")
+//
+//        expectedResult = ["a", "z", "12", "90", "345678"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "a345678z", andSecondString:"1234567890") as! [String], "Single Match #2.")
+//
+//        expectedResult = ["abc", "z", "1234", "0", "56789"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "abc56789z", andSecondString:"1234567890") as! [String], "Single Match #3.")
+//
+//        expectedResult = ["a", "xyz", "1", "7890", "23456"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "a23456xyz", andSecondString:"1234567890") as! [String], "Single Match #4.")
+//
+//        // Multiple Matches.
+//        expectedResult = ["12123", "123121", "a", "z", "1234123451234"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "121231234123451234123121", andSecondString:"a1234123451234z") as! [String], "Multiple Matches #1.")
+//
+//        expectedResult = ["", "-=-=-=-=-=", "x", "", "x-=-=-=-=-=-=-="]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "x-=-=-=-=-=-=-=-=-=-=-=-=", andSecondString:"xx-=-=-=-=-=-=-=") as! [String], "Multiple Matches #2.")
+//
+//        expectedResult = ["-=-=-=-=-=", "", "", "y", "-=-=-=-=-=-=-=y"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "-=-=-=-=-=-=-=-=-=-=-=-=y", andSecondString:"-=-=-=-=-=-=-=yy") as! [String], "Multiple Matches #3.")
+//
+//        // Non-optimal halfmatch.
+//        // Optimal diff would be -q+x=H-i+e=lloHe+Hu=llo-Hew+y not -qHillo+x=HelloHe-w+Hulloy
+//        expectedResult = ["qHillo", "w", "x", "Hulloy", "HelloHe"]
+//        XCTAssertEqual(expectedResult, dmp.diff_halfMatch(ofFirstString: "qHilloHelloHew", andSecondString:"xHelloHeHulloy") as! [String], "Non-optimal halfmatch.")
+//
+//        // Optimal no halfmatch.
+//        dmp.diff_Timeout = 0
+//        XCTAssertEqual(dmp.diff_halfMatch(ofFirstString: "qHilloHelloHew", andSecondString:"xHelloHeHulloy").count, 0, "Optimal no halfmatch.")
+//    }
+//
+//    func test_diff_linesToChars() {
+//        let dmp = __DiffMatchPatch()
+//        var result = [Any]()
+//
+//        // Convert lines down to characters.
+//        var tmpVector = ["", "alpha\n", "beta\n"]
+//        result = dmp.diff_linesToChars(forFirstString: "alpha\nbeta\nalpha\n", andSecondString:"beta\nalpha\nbeta\n")
+//        XCTAssertEqual("\u{01}\u{02}\u{01}", result[0] as? String, "Shared lines #1.")
+//        XCTAssertEqual("\u{02}\u{01}\u{02}", result[1] as? String, "Shared lines #2.")
+//        XCTAssertEqual(tmpVector, result[2] as! [String], "Shared lines #3.")
+//
+//        tmpVector = ["", "alpha\r\n", "beta\r\n", "\r\n"]
+//        result = dmp.diff_linesToChars(forFirstString: "", andSecondString:"alpha\r\nbeta\r\n\r\n\r\n")
+//        XCTAssertEqual("", result[0] as? String, "Empty string and blank lines #1.")
+//        XCTAssertEqual("\u{01}\u{02}\u{03}\u{03}", result[1] as? String, "Empty string and blank lines #2.")
+//        XCTAssertEqual(tmpVector, result[2] as! [String], "Empty string and blank lines #3.")
+//
+//        tmpVector = ["", "a", "b"]
+//        result = dmp.diff_linesToChars(forFirstString: "a", andSecondString:"b")
+//        XCTAssertEqual("\u{01}", result[0] as? String, "No linebreaks #1.")
+//        XCTAssertEqual("\u{02}", result[1] as? String, "No linebreaks #2.")
+//        XCTAssertEqual(tmpVector, result[2] as! [String], "No linebreaks #3.")
+//
+//        // More than 256 to reveal any 8-bit limitations.
+//        let n = 300
+//        tmpVector = []
+//        var lines = ""
+//        var chars = ""
+//        for x in 1...n {
+//            let currentLine = "\(x)\n"
+//            tmpVector.append(currentLine)
+//            lines += currentLine
+//            chars += String(format: "%C", x)
+//        }
+//        XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
+//        XCTAssertEqual(n, chars.count, "More than 256 #2.")
+//        tmpVector.insert("", at: 0)
+//
+//        result = dmp.diff_linesToChars(forFirstString: lines, andSecondString:"")
+//        XCTAssertEqual(chars, result[0] as? String, "More than 256 #3.")
+//        XCTAssertEqual("", result[1] as? String, "More than 256 #4.")
+//        XCTAssertEqual(tmpVector, result[2] as! [String], "More than 256 #5.")
+//    }
+//
+//    func test_diff_charsToLines() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Convert chars up to lines.
+//        var diffs = [
+//            __Diff(operation: .diffEqual, andText: "\u{01}\u{02}\u{01}"),
+//            __Diff(operation: .diffInsert, andText: "\u{02}\u{01}\u{02}")
+//        ]
+//        var tmpVector = ["", "alpha\n", "beta\n"]
+//        dmp.diff_chars(diffs, toLines: tmpVector)
+//        let expectedResult = [
+//            __Diff(operation: .diffEqual, andText: "alpha\nbeta\nalpha\n"),
+//            __Diff(operation: .diffInsert, andText: "beta\nalpha\nbeta\n")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "Shared lines.")
+//
+//        // More than 256 to reveal any 8-bit limitations.
+//        let n = 300
+//        tmpVector = []
+//        var lines = ""
+//        var chars = ""
+//        for x in 1...n {
+//            let currentLine = String(format: "%d\n", x)
+//            tmpVector.append(currentLine)
+//            lines += currentLine
+//            chars += String(format: "%C", x)
+//        }
+//        XCTAssertEqual(n, tmpVector.count, "More than 256 #1.")
+//        XCTAssertEqual(n, chars.count, "More than 256 #2.")
+//        tmpVector.insert("", at: 0)
+//        diffs = [__Diff(operation: .diffDelete, andText: chars)]
+//        dmp.diff_chars(diffs, toLines: tmpVector)
+//        XCTAssertEqual([__Diff(operation: .diffDelete, andText: lines)], diffs, "More than 256 #3.")
+//    }
+//
+//    func test_diff_cleanupMerge() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Cleanup a messy diff.
+//        // Null case.
+//        XCTAssertEqual([__Diff](), dmp.diff_cleanupMerge([__Diff]()), "Null case.")
+//
+//        // No change case.
+//        var diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"b"), __Diff(operation:.diffInsert, andText:"c")]
+//        var expectedResult = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"b"), __Diff(operation:.diffInsert, andText:"c")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "No change case.")
+//
+//        // Merge equalities.
+//        diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffEqual, andText:"b"), __Diff(operation:.diffEqual, andText:"c")]
+//        expectedResult = [__Diff(operation:.diffEqual, andText:"abc")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge equalities.")
+//
+//        // Merge deletions.
+//        diffs = [__Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffDelete, andText:"b"), __Diff(operation:.diffDelete, andText:"c")]
+//        expectedResult = [__Diff(operation:.diffDelete, andText:"abc")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge deletions.")
+//
+//        // Merge insertions.
+//        diffs = [__Diff(operation:.diffInsert, andText:"a"), __Diff(operation:.diffInsert, andText:"b"), __Diff(operation:.diffInsert, andText:"c")]
+//        expectedResult = [__Diff(operation:.diffInsert, andText:"abc")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge insertions.")
+//
+//        // Merge interweave.
+//        diffs = [__Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffInsert, andText:"b"), __Diff(operation:.diffDelete, andText:"c"), __Diff(operation:.diffInsert, andText:"d"), __Diff(operation:.diffEqual, andText:"e"), __Diff(operation:.diffEqual, andText:"f")]
+//        expectedResult = [__Diff(operation:.diffDelete, andText:"ac"), __Diff(operation:.diffInsert, andText:"bd"), __Diff(operation:.diffEqual, andText:"ef")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Merge interweave.")
+//
+//        // Prefix and suffix detection.
+//        diffs = [__Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffInsert, andText:"abc"), __Diff(operation:.diffDelete, andText:"dc")]
+//        expectedResult = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"d"), __Diff(operation:.diffInsert, andText:"b"), __Diff(operation:.diffEqual, andText:"c")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Prefix and suffix detection.")
+//
+//        // Prefix and suffix detection with equalities.
+//        diffs = [__Diff(operation:.diffEqual, andText:"x"), __Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffInsert, andText:"abc"), __Diff(operation:.diffDelete, andText:"dc"), __Diff(operation:.diffEqual, andText:"y")]
+//        expectedResult = [__Diff(operation:.diffEqual, andText:"xa"), __Diff(operation:.diffDelete, andText:"d"), __Diff(operation:.diffInsert, andText:"b"), __Diff(operation:.diffEqual, andText:"cy")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Prefix and suffix detection with equalities.")
+//
+//        // Slide edit left.
+//        diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffInsert, andText:"ba"), __Diff(operation:.diffEqual, andText:"c")]
+//        expectedResult = [__Diff(operation:.diffInsert, andText:"ab"), __Diff(operation:.diffEqual, andText:"ac")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit left.")
+//
+//        // Slide edit right.
+//        diffs = [__Diff(operation:.diffEqual, andText:"c"), __Diff(operation:.diffInsert, andText:"ab"), __Diff(operation:.diffEqual, andText:"a")]
+//        expectedResult = [__Diff(operation:.diffEqual, andText:"ca"), __Diff(operation:.diffInsert, andText:"ba")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit right.")
+//
+//        // Slide edit left recursive.
+//        diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"b"), __Diff(operation:.diffEqual, andText:"c"), __Diff(operation:.diffDelete, andText:"ac"), __Diff(operation:.diffEqual, andText:"x")]
+//        expectedResult = [__Diff(operation:.diffDelete, andText:"abc"), __Diff(operation:.diffEqual, andText:"acx")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit left recursive.")
+//
+//        // Slide edit right recursive.
+//        diffs = [__Diff(operation:.diffEqual, andText:"x"), __Diff(operation:.diffDelete, andText:"ca"), __Diff(operation:.diffEqual, andText:"c"), __Diff(operation:.diffDelete, andText:"b"), __Diff(operation:.diffEqual, andText:"a")]
+//        expectedResult = [__Diff(operation:.diffEqual, andText:"xca"), __Diff(operation:.diffDelete, andText:"cba")]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupMerge(diffs), "Slide edit right recursive.")
+//    }
+//
+//    func test_diff_cleanupSemanticLossless() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Slide diffs to match logical boundaries.
+//        // Null case.
+//        XCTAssertEqual([__Diff](), dmp.diff_cleanupSemanticLossless([__Diff]()), "Null case.")
+//
+//        // Blank lines.
+//        var diffs = [
+//            __Diff(operation:.diffEqual, andText:"AAA\r\n\r\nBBB"),
+//            __Diff(operation:.diffInsert, andText:"\r\nDDD\r\n\r\nBBB"),
+//            __Diff(operation:.diffEqual, andText:"\r\nEEE")
+//        ]
+//        var expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"AAA\r\n\r\n"),
+//            __Diff(operation:.diffInsert, andText:"BBB\r\nDDD\r\n\r\n"),
+//            __Diff(operation:.diffEqual, andText:"BBB\r\nEEE")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Blank lines.")
+//
+//        // Line boundaries.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"AAA\r\nBBB"),
+//            __Diff(operation:.diffInsert, andText:" DDD\r\nBBB"),
+//            __Diff(operation:.diffEqual, andText:" EEE")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"AAA\r\n"),
+//            __Diff(operation:.diffInsert, andText:"BBB DDD\r\n"),
+//            __Diff(operation:.diffEqual, andText:"BBB EEE")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Line boundaries.")
+//
+//        // Word boundaries.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"The c"),
+//            __Diff(operation:.diffInsert, andText:"ow and the c"),
+//            __Diff(operation:.diffEqual, andText:"at.")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"The "),
+//            __Diff(operation:.diffInsert, andText:"cow and the "),
+//            __Diff(operation:.diffEqual, andText:"cat.")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Word boundaries.")
+//
+//        // Alphanumeric boundaries.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"The-c"),
+//            __Diff(operation:.diffInsert, andText:"ow-and-the-c"),
+//            __Diff(operation:.diffEqual, andText:"at.")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"The-"),
+//            __Diff(operation:.diffInsert, andText:"cow-and-the-"),
+//            __Diff(operation:.diffEqual, andText:"cat.")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Alphanumeric boundaries.")
+//
+//        // Hitting the start.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"a"),
+//            __Diff(operation:.diffDelete, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:"ax")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:"aax")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Hitting the start.")
+//
+//        // Hitting the end.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"xa"),
+//            __Diff(operation:.diffDelete, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:"a")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"xaa"),
+//            __Diff(operation:.diffDelete, andText:"a")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Hitting the end.")
+//
+//        // Alphanumeric boundaries.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"The xxx. The "),
+//            __Diff(operation:.diffInsert, andText:"zzz. The "),
+//            __Diff(operation:.diffEqual, andText:"yyy.")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"The xxx."),
+//            __Diff(operation:.diffInsert, andText:" The zzz."),
+//            __Diff(operation:.diffEqual, andText:" The yyy.")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemanticLossless(diffs), "Sentence boundaries.")
+//    }
+//
+//    func test_diff_cleanupSemantic() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Cleanup semantically trivial equalities.
+//        // Null case.
+//        XCTAssertEqual([__Diff](), dmp.diff_cleanupSemantic([__Diff]()), "Null case.")
+//
+//        // No elimination #1.
+//        var diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"cd"),
+//            __Diff(operation:.diffEqual, andText:"12"),
+//            __Diff(operation:.diffDelete, andText:"e")
+//        ]
+//        var expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"cd"),
+//            __Diff(operation:.diffEqual, andText:"12"),
+//            __Diff(operation:.diffDelete, andText:"e")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No elimination #1.")
+//
+//        // No elimination #2.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffInsert, andText:"ABC"),
+//            __Diff(operation:.diffEqual, andText:"1234"),
+//            __Diff(operation:.diffDelete, andText:"wxyz")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffInsert, andText:"ABC"),
+//            __Diff(operation:.diffEqual, andText:"1234"),
+//            __Diff(operation:.diffDelete, andText:"wxyz")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No elimination #2.")
+//
+//        // Simple elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:"b"),
+//            __Diff(operation:.diffDelete, andText:"c")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffInsert, andText:"b")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Simple elimination.")
+//
+//        // Backpass elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffEqual, andText:"cd"),
+//            __Diff(operation:.diffDelete, andText:"e"),
+//            __Diff(operation:.diffEqual, andText:"f"),
+//            __Diff(operation:.diffInsert, andText:"g")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abcdef"),
+//            __Diff(operation:.diffInsert, andText:"cdfg")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Backpass elimination.")
+//
+//        // Multiple eliminations.
+//        diffs = [
+//            __Diff(operation:.diffInsert, andText:"1"),
+//            __Diff(operation:.diffEqual, andText:"A"),
+//            __Diff(operation:.diffDelete, andText:"B"),
+//            __Diff(operation:.diffInsert, andText:"2"),
+//            __Diff(operation:.diffEqual, andText:"_"),
+//            __Diff(operation:.diffInsert, andText:"1"),
+//            __Diff(operation:.diffEqual, andText:"A"),
+//            __Diff(operation:.diffDelete, andText:"B"),
+//            __Diff(operation:.diffInsert, andText:"2")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"AB_AB"),
+//            __Diff(operation:.diffInsert, andText:"1A2_1A2")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Multiple eliminations.")
+//
+//        // Word boundaries.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"The c"),
+//            __Diff(operation:.diffDelete, andText:"ow and the c"),
+//            __Diff(operation:.diffEqual, andText:"at.")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffEqual, andText:"The "),
+//            __Diff(operation:.diffDelete, andText:"cow and the "),
+//            __Diff(operation:.diffEqual, andText:"cat.")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Word boundaries.")
+//
+//        // No overlap elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"abcxx"),
+//            __Diff(operation:.diffInsert, andText:"xxdef")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abcxx"),
+//            __Diff(operation:.diffInsert, andText:"xxdef")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "No overlap elimination.")
+//
+//        // Overlap elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"abcxxx"),
+//            __Diff(operation:.diffInsert, andText:"xxxdef")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffEqual, andText:"xxx"),
+//            __Diff(operation:.diffInsert, andText:"def")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Overlap elimination.")
+//
+//        // Reverse overlap elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"xxxabc"),
+//            __Diff(operation:.diffInsert, andText:"defxxx")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffInsert, andText:"def"),
+//            __Diff(operation:.diffEqual, andText:"xxx"),
+//            __Diff(operation:.diffDelete, andText:"abc")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Reverse overlap elimination.")
+//
+//        // Two overlap eliminations.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"abcd1212"),
+//            __Diff(operation:.diffInsert, andText:"1212efghi"),
+//            __Diff(operation:.diffEqual, andText:"----"),
+//            __Diff(operation:.diffDelete, andText:"A3"),
+//            __Diff(operation:.diffInsert, andText:"3BC")
+//        ]
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abcd"),
+//            __Diff(operation:.diffEqual, andText:"1212"),
+//            __Diff(operation:.diffInsert, andText:"efghi"),
+//            __Diff(operation:.diffEqual, andText:"----"),
+//            __Diff(operation:.diffDelete, andText:"A"),
+//            __Diff(operation:.diffEqual, andText:"3"),
+//            __Diff(operation:.diffInsert, andText:"BC")
+//        ]
+//        XCTAssertEqual(expectedResult, dmp.diff_cleanupSemantic(diffs), "Two overlap eliminations.")
+//    }
+//
+//    func test_diff_cleanupEfficiency() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Cleanup operationally trivial equalities.
+//        dmp.diff_EditCost = 4;
+//        // Null case.
+//        var diffs = dmp.diff_cleanupEfficiency([__Diff]())
+//        XCTAssertEqual([__Diff](), diffs, "Null case.")
+//
+//        // No elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"wxyz"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"34")
+//        ]
+//        diffs = dmp.diff_cleanupEfficiency(diffs)
+//        var expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"wxyz"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"34")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "No elimination.")
+//
+//        // Four-edit elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"xyz"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"34")
+//        ]
+//        diffs = dmp.diff_cleanupEfficiency(diffs)
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abxyzcd"),
+//            __Diff(operation:.diffInsert, andText:"12xyz34")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "Four-edit elimination.")
+//
+//        // Three-edit elimination.
+//        diffs = [
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"x"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"34")
+//        ]
+//        diffs = dmp.diff_cleanupEfficiency(diffs)
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"xcd"),
+//            __Diff(operation:.diffInsert, andText:"12x34")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "Three-edit elimination.")
+//
+//        // Backpass elimination.
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"xy"),
+//            __Diff(operation:.diffInsert, andText:"34"),
+//            __Diff(operation:.diffEqual, andText:"z"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"56")
+//        ]
+//        diffs = dmp.diff_cleanupEfficiency(diffs)
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abxyzcd"),
+//            __Diff(operation:.diffInsert, andText:"12xy34z56")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "Backpass elimination.")
+//
+//        // High cost elimination.
+//        dmp.diff_EditCost = 5;
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"ab"),
+//            __Diff(operation:.diffInsert, andText:"12"),
+//            __Diff(operation:.diffEqual, andText:"wxyz"),
+//            __Diff(operation:.diffDelete, andText:"cd"),
+//            __Diff(operation:.diffInsert, andText:"34")
+//        ]
+//        diffs = dmp.diff_cleanupEfficiency(diffs)
+//        expectedResult = [
+//            __Diff(operation:.diffDelete, andText:"abwxyzcd"),
+//            __Diff(operation:.diffInsert, andText:"12wxyz34")
+//        ]
+//        XCTAssertEqual(expectedResult, diffs, "High cost elimination.")
+//    }
+//
+//    func test_diff_prettyHtml() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Pretty print.
+//        let diffs = [
+//            __Diff(operation:.diffEqual, andText:"a\n"),
+//            __Diff(operation:.diffDelete, andText:"<B>b</B>"),
+//            __Diff(operation:.diffInsert, andText:"c&d")
+//        ]
+//        let expectedResult = "<span>a&para;<br></span><del style=\"background:#ffe6e6;\">&lt;B&gt;b&lt;/B&gt;</del><ins style=\"background:#e6ffe6;\">c&amp;d</ins>";
+//        XCTAssertEqual(expectedResult, dmp.diff_prettyHtml(diffs), "Pretty print.")
+//    }
+//
+//    func test_diff_text() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Compute the source and destination texts.
+//        let diffs = [
+//            __Diff(operation:.diffEqual, andText:"jump"),
+//            __Diff(operation:.diffDelete, andText:"s"),
+//            __Diff(operation:.diffInsert, andText:"ed"),
+//            __Diff(operation:.diffEqual, andText:" over "),
+//            __Diff(operation:.diffDelete, andText:"the"),
+//            __Diff(operation:.diffInsert, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:" lazy")
+//        ]
+//        XCTAssertEqual("jumps over the lazy", dmp.diff_text1(diffs), "Compute the source and destination texts #1")
+//        XCTAssertEqual("jumped over a lazy", dmp.diff_text2(diffs), "Compute the source and destination texts #2")
+//    }
+//
+//    func test_diff_delta() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Convert a diff into delta string.
+//        var diffs = [
+//            __Diff(operation:.diffEqual, andText:"jump"),
+//            __Diff(operation:.diffDelete, andText:"s"),
+//            __Diff(operation:.diffInsert, andText:"ed"),
+//            __Diff(operation:.diffEqual, andText:" over "),
+//            __Diff(operation:.diffDelete, andText:"the"),
+//            __Diff(operation:.diffInsert, andText:"a"),
+//            __Diff(operation:.diffEqual, andText:" lazy"),
+//            __Diff(operation:.diffInsert, andText:"old dog")
+//        ]
+//        var text1 = dmp.diff_text1(diffs)
+//        XCTAssertEqual("jumps over the lazy", text1, "Convert a diff into delta string 1.")
+//
+//        var delta = dmp.diff_(toDelta: diffs)
+//        XCTAssertEqual("=4\t-1\t+ed\t=6\t-3\t+a\t=5\t+old dog", delta, "Convert a diff into delta string 2.")
+//
+//        // Convert delta string into a diff.
+//        XCTAssertEqual(diffs, try dmp.diff_fromDelta(withText: text1, andDelta: delta), "Convert delta string into a diff.")
+//
+//        // Generates error (19 < 20).
+//        do {
+//            try dmp.diff_fromDelta(withText: text1 + "x", andDelta: delta)
+//            XCTFail("expected error")
+//        } catch let err as NSError {
+//            XCTAssertEqual(err.code, 103)
+//            XCTAssertEqual(err.localizedDescription, "Delta length (19) smaller than source text length (20).")
+//        } catch {
+//            XCTFail("unexpected error type")
+//        }
+//
+//        // Generates error (19 > 18).
+//        do {
+//            try dmp.diff_fromDelta(withText: text1.substring(from: text1.index(after: text1.startIndex)), andDelta:delta)
+//            XCTFail("expected error")
+//        } catch let err as NSError {
+//            XCTAssertEqual(err.code, 102)
+//            XCTAssertEqual(err.localizedDescription, "Delta length (19) larger than source text length (18).")
+//        } catch {
+//            XCTFail("unexpected error type")
+//        }
+//
+//        // Generates error (%c3%xy invalid Unicode).
+//        do {
+//            try dmp.diff_fromDelta(withText:"", andDelta:"+%c3%xy")
+//            XCTFail("expected error")
+//        } catch let err as NSError {
+//            XCTAssertEqual(err.code, 99)
+//            XCTAssertEqual(err.localizedDescription, "Invalid character in diff_fromDelta: (null)")
+//        } catch {
+//            XCTFail("unexpected error type")
+//        }
+//
+//        // Test deltas with special characters.
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:String(format:"\u{00000680} %C \t %%", 0)),
+//            __Diff(operation:.diffDelete, andText:String(format:"\u{00000681} %C \n ^", 1)),
+//            __Diff(operation:.diffInsert, andText:String(format:"\u{00000682} %C \\ |", 2))
+//        ]
+//        text1 = dmp.diff_text1(diffs)
+//        let expectedString = String(format:"\u{00000680} %C \t %%\u{00000681} %C \n ^", 0, 1)
+//        XCTAssertEqual(expectedString, text1, "Test deltas with special characters.")
+//
+//        delta = dmp.diff_(toDelta: diffs)
+//        // Upper case, because to CFURLCreateStringByAddingPercentEscapes() uses upper.
+//        XCTAssertEqual("=7\t-7\t+%DA%82 %02 %5C %7C", delta, "diff_toDelta: Unicode 1.")
+//
+//        XCTAssertEqual(diffs, try! dmp.diff_fromDelta(withText:text1, andDelta:delta), "diff_fromDelta: Unicode 2.")
+//
+//        // Verify pool of unchanged characters.
+//        diffs = [__Diff(operation:.diffInsert, andText:"A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ")]
+//        let text2 = dmp.diff_text2(diffs)
+//        XCTAssertEqual("A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ", text2, "diff_text2: Unchanged characters 1.")
+//
+//        delta = dmp.diff_(toDelta: diffs)
+//        XCTAssertEqual("+A-Z a-z 0-9 - _ . ! ~ * ' ( ) ; / ? : @ & = + $ , # ", delta, "diff_toDelta: Unchanged characters 2.")
+//
+//        // Convert delta string into a diff.
+//        let expectedResult = try! dmp.diff_fromDelta(withText:"", andDelta: delta)
+//        XCTAssertEqual(diffs, expectedResult, "diff_fromDelta: Unchanged characters. Convert delta string into a diff.")
+//    }
+//
+//    func test_diff_xIndex() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Translate a location in text1 to text2.
+//        var diffs = [
+//            __Diff(operation:.diffDelete, andText:"a"),
+//            __Diff(operation:.diffInsert, andText:"1234"),
+//            __Diff(operation:.diffEqual, andText:"xyz")
+//        ]
+//        XCTAssertEqual(5, dmp.diff_xIndex(in: diffs, location:2), "diff_xIndex: Translation on equality. Translate a location in text1 to text2.")
+//
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"a"),
+//            __Diff(operation:.diffDelete, andText:"1234"),
+//            __Diff(operation:.diffEqual, andText:"xyz")
+//        ]
+//        XCTAssertEqual(1, dmp.diff_xIndex(in: diffs, location:3), "diff_xIndex: Translation on deletion.")
+//    }
+//
+//    func test_diff_levenshtein() {
+//        let dmp = __DiffMatchPatch()
+//
+//        var diffs = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffInsert, andText:"1234"),
+//            __Diff(operation:.diffEqual, andText:"xyz")
+//        ]
+//        XCTAssertEqual(4, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with trailing equality.")
+//
+//        diffs = [
+//            __Diff(operation:.diffEqual, andText:"xyz"),
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffInsert, andText:"1234")
+//        ]
+//        XCTAssertEqual(4, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with leading equality.")
+//
+//        diffs = [
+//            __Diff(operation:.diffDelete, andText:"abc"),
+//            __Diff(operation:.diffEqual, andText:"xyz"),
+//            __Diff(operation:.diffInsert, andText:"1234")
+//        ]
+//        XCTAssertEqual(7, dmp.diff_levenshtein(diffs), "diff_levenshtein: Levenshtein with middle equality.")
+//    }
+//
+//    func diff_bisectTest() {
+//        let dmp = __DiffMatchPatch()
+//
+//        // Normal.
+//        let a = "cat"
+//        let b = "map"
+//        // Since the resulting diff hasn't been normalized, it would be ok if
+//        // the insertion and deletion pairs are swapped.
+//        // If the order changes, tweak this test as required.
+//        var diffs = [
+//            __Diff(operation:.diffDelete, andText:"c"),
+//            __Diff(operation:.diffInsert, andText:"m"),
+//            __Diff(operation:.diffEqual, andText:"a"),
+//            __Diff(operation:.diffDelete, andText:"t"),
+//            __Diff(operation:.diffInsert, andText:"p")
+//        ] as NSArray
+//        XCTAssertEqual(diffs, dmp.diff_bisect(ofOldString: a, andNewString: b, deadline: Date.distantFuture.timeIntervalSinceReferenceDate), "Bisect test.")
+//
+//        // Timeout.
+//        diffs = [__Diff(operation:.diffDelete, andText:"cat"), __Diff(operation:.diffInsert, andText:"map")]
+//        XCTAssertEqual(diffs, dmp.diff_bisect(ofOldString: a, andNewString:b, deadline:Date.distantFuture.timeIntervalSinceReferenceDate), "Bisect timeout.")
+//    }
 
 // func test_diff_main() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   // Perform a trivial diff.
 //   NSMutableArray *diffs = [NSMutableArray array];
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"", andNewString:"" checkLines:NO], "diff_main: Null case.")
 //
-//   diffs = [Diff(operation:.diffEqual, andText:"abc")]
+//   diffs = [__Diff(operation:.diffEqual, andText:"abc")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"abc", andNewString:"abc" checkLines:NO], "diff_main: Equality.")
 //
-//   diffs = [Diff(operation:.diffEqual, andText:"ab"), Diff(operation:.diffInsert, andText:"123"), Diff(operation:.diffEqual, andText:"c")]
+//   diffs = [__Diff(operation:.diffEqual, andText:"ab"), __Diff(operation:.diffInsert, andText:"123"), __Diff(operation:.diffEqual, andText:"c")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"abc", andNewString:"ab123c" checkLines:NO], "diff_main: Simple insertion.")
 //
-//   diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"123"), Diff(operation:.diffEqual, andText:"bc")]
+//   diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"123"), __Diff(operation:.diffEqual, andText:"bc")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"a123bc", andNewString:"abc" checkLines:NO], "diff_main: Simple deletion.")
 //
-//   diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffInsert, andText:"123"), Diff(operation:.diffEqual, andText:"b"), Diff(operation:.diffInsert, andText:"456"), Diff(operation:.diffEqual, andText:"c")]
+//   diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffInsert, andText:"123"), __Diff(operation:.diffEqual, andText:"b"), __Diff(operation:.diffInsert, andText:"456"), __Diff(operation:.diffEqual, andText:"c")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"abc", andNewString:"a123b456c" checkLines:NO], "diff_main: Two insertions.")
 //
-//   diffs = [Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"123"), Diff(operation:.diffEqual, andText:"b"), Diff(operation:.diffDelete, andText:"456"), Diff(operation:.diffEqual, andText:"c")]
+//   diffs = [__Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"123"), __Diff(operation:.diffEqual, andText:"b"), __Diff(operation:.diffDelete, andText:"456"), __Diff(operation:.diffEqual, andText:"c")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"a123b456c", andNewString:"abc" checkLines:NO], "diff_main: Two deletions.")
 //
 //   // Perform a real diff.
 //   // Switch off the timeout.
 //   dmp.Diff_Timeout = 0;
-//   diffs = [Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffInsert, andText:"b")]
+//   diffs = [__Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffInsert, andText:"b")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"a", andNewString:"b" checkLines:NO], "diff_main: Simple case #1.")
 //
-//   diffs = [Diff(operation:.diffDelete, andText:"Apple"), Diff(operation:.diffInsert, andText:"Banana"), Diff(operation:.diffEqual, andText:"s are a"), Diff(operation:.diffInsert, andText:"lso"), Diff(operation:.diffEqual, andText:" fruit.")]
+//   diffs = [__Diff(operation:.diffDelete, andText:"Apple"), __Diff(operation:.diffInsert, andText:"Banana"), __Diff(operation:.diffEqual, andText:"s are a"), __Diff(operation:.diffInsert, andText:"lso"), __Diff(operation:.diffEqual, andText:" fruit.")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"Apples are a fruit.", andNewString:"Bananas are also fruit." checkLines:NO], "diff_main: Simple case #2.")
 //
-//   diffs = [Diff(operation:.diffDelete, andText:"a"), Diff(operation:.diffInsert, andText:"\u{00000680"), Diff(operation:.diffEqual, andText:"x"), Diff(operation:.diffDelete, andText:"\t"), Diff(operation:.diffInsert, andText:String(format:"%C", 0]]]
+//   diffs = [__Diff(operation:.diffDelete, andText:"a"), __Diff(operation:.diffInsert, andText:"\u{00000680"), __Diff(operation:.diffEqual, andText:"x"), __Diff(operation:.diffDelete, andText:"\t"), __Diff(operation:.diffInsert, andText:String(format:"%C", 0]]]
 //   NSString *aString = String(format:"\u{00000680x%C", 0];
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"ax\t", andNewString:aString checkLines:NO], "diff_main: Simple case #3.")
 //
-//   diffs = [Diff(operation:.diffDelete, andText:"1"), Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"y"), Diff(operation:.diffEqual, andText:"b"), Diff(operation:.diffDelete, andText:"2"), Diff(operation:.diffInsert, andText:"xab")]
+//   diffs = [__Diff(operation:.diffDelete, andText:"1"), __Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"y"), __Diff(operation:.diffEqual, andText:"b"), __Diff(operation:.diffDelete, andText:"2"), __Diff(operation:.diffInsert, andText:"xab")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"1ayb2", andNewString:"abxab" checkLines:NO], "diff_main: Overlap #1.")
 //
-//   diffs = [Diff(operation:.diffInsert, andText:"xaxcx"), Diff(operation:.diffEqual, andText:"abc"), Diff(operation:.diffDelete, andText:"y")]
+//   diffs = [__Diff(operation:.diffInsert, andText:"xaxcx"), __Diff(operation:.diffEqual, andText:"abc"), __Diff(operation:.diffDelete, andText:"y")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"abcy", andNewString:"xaxcxabc" checkLines:NO], "diff_main: Overlap #2.")
 //
-//   diffs = [Diff(operation:.diffDelete, andText:"ABCD"), Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffDelete, andText:"="), Diff(operation:.diffInsert, andText:"-"), Diff(operation:.diffEqual, andText:"bcd"), Diff(operation:.diffDelete, andText:"="), Diff(operation:.diffInsert, andText:"-"), Diff(operation:.diffEqual, andText:"efghijklmnopqrs"), Diff(operation:.diffDelete, andText:"EFGHIJKLMNOefg")]
+//   diffs = [__Diff(operation:.diffDelete, andText:"ABCD"), __Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffDelete, andText:"="), __Diff(operation:.diffInsert, andText:"-"), __Diff(operation:.diffEqual, andText:"bcd"), __Diff(operation:.diffDelete, andText:"="), __Diff(operation:.diffInsert, andText:"-"), __Diff(operation:.diffEqual, andText:"efghijklmnopqrs"), __Diff(operation:.diffDelete, andText:"EFGHIJKLMNOefg")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"ABCDa=bcd=efghijklmnopqrsEFGHIJKLMNOefg", andNewString:"a-bcd-efghijklmnopqrs" checkLines:NO], "diff_main: Overlap #3.")
 //
-//   diffs = [Diff(operation:.diffInsert, andText:" "), Diff(operation:.diffEqual, andText:"a"), Diff(operation:.diffInsert, andText:"nd"), Diff(operation:.diffEqual, andText:" [[Pennsylvania]]"), Diff(operation:.diffDelete, andText:", and [[New")]
+//   diffs = [__Diff(operation:.diffInsert, andText:" "), __Diff(operation:.diffEqual, andText:"a"), __Diff(operation:.diffInsert, andText:"nd"), __Diff(operation:.diffEqual, andText:" [[Pennsylvania]]"), __Diff(operation:.diffDelete, andText:", and [[New")]
 //   XCTAssertEqual(diffs, [dmp diff_mainOfOldString:"a [[Pennsylvania]] and [[New", andNewString:", and [[Pennsylvania]]" checkLines:NO], "diff_main: Large equality.")
 //
 //   dmp.Diff_Timeout = 0.1f;  // 100ms
@@ -858,7 +858,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //
 //
 // func test_match_alphabet() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   // Initialise the bitmasks for Bitap.
 //   NSMutableDictionary *bitmask = [NSMutableDictionary dictionary];
@@ -878,7 +878,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_match_bitap() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   // Bitap algorithm.
 //   dmp.Match_Distance = 100;
@@ -927,7 +927,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_match_main() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   // Full match.
 //   XCTAssertEqual(0, [dmp match_mainForText:"abcdef" pattern:"abcdef" near:1000], "match_main: Equality.")
@@ -964,19 +964,19 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //   p.length1 = 18;
 //   p.length2 = 17;
 //   p.diffs = [
-//       Diff(operation:.diffEqual, andText:"jump"),
-//       Diff(operation:.diffDelete, andText:"s"),
-//       Diff(operation:.diffInsert, andText:"ed"),
-//       Diff(operation:.diffEqual, andText:" over "),
-//       Diff(operation:.diffDelete, andText:"the"),
-//       Diff(operation:.diffInsert, andText:"a"),
-//       Diff(operation:.diffEqual, andText:"\nlaz")]
+//       __Diff(operation:.diffEqual, andText:"jump"),
+//       __Diff(operation:.diffDelete, andText:"s"),
+//       __Diff(operation:.diffInsert, andText:"ed"),
+//       __Diff(operation:.diffEqual, andText:" over "),
+//       __Diff(operation:.diffDelete, andText:"the"),
+//       __Diff(operation:.diffInsert, andText:"a"),
+//       __Diff(operation:.diffEqual, andText:"\nlaz")]
 //   NSString *strp = "@@ -21,18 +22,17 @@\n jump\n-s\n+ed\n  over \n-the\n+a\n %0Alaz\n";
 //   XCTAssertEqual(strp, [p description], "Patch: description.")
 // }
 //
 // func test_patch_fromText() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   XCTAssertTrue(((NSMutableArray *)[dmp patch_fromText:"" error:NULL]).count == 0, "patch_fromText: #0.")
 //
@@ -1002,7 +1002,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_patch_toText() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   NSString *strp = "@@ -21,18 +22,17 @@\n jump\n-s\n+ed\n  over \n-the\n+a\n  laz\n";
 //   NSMutableArray *patches;
@@ -1017,7 +1017,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_patch_addContext() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   dmp.Patch_Margin = 4;
 //   Patch *p;
@@ -1041,7 +1041,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_patch_make() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   NSMutableArray *patches;
 //   patches = [dmp patch_makeFromOldString:"", andNewString:"")
@@ -1060,13 +1060,13 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //
 //   NSMutableArray *diffs = [dmp diff_mainOfOldString:text1 andNewString:text2 checkLines:NO];
 //   patches = [dmp patch_makeFromDiffs:diffs];
-//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: Diff input.")
+//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: __Diff input.")
 //
 //   patches = [dmp patch_makeFromOldString:text1 andDiffs:diffs];
-//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: Text1+Diff inputs.")
+//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: Text1+__Diff inputs.")
 //
 //   patches = [dmp patch_makeFromOldString:text1 newString:text2 diffs:diffs];
-//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: Text1+Text2+Diff inputs (deprecated).")
+//   XCTAssertEqual(expectedPatch, [dmp patch_toText:patches], "patch_make: Text1+Text2+__Diff inputs (deprecated).")
 //
 //   patches = [dmp patch_makeFromOldString:"`1234567890-=[]\\;',./", andNewString:"~!@#$%^&*()_+{}|:\"<>?")
 //   XCTAssertEqual("@@ -1,21 +1,21 @@\n-%601234567890-=%5B%5D%5C;',./\n+~!@#$%25%5E&*()_+%7B%7D%7C:%22%3C%3E?\n",
@@ -1074,8 +1074,8 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //       "patch_toText: Character encoding.")
 //
 //   diffs = [
-//       Diff(operation:.diffDelete, andText:"`1234567890-=[]\\;',./"),
-//       Diff(operation:.diffInsert, andText:"~!@#$%^&*()_+{}|:\"<>?")]
+//       __Diff(operation:.diffDelete, andText:"`1234567890-=[]\\;',./"),
+//       __Diff(operation:.diffInsert, andText:"~!@#$%^&*()_+{}|:\"<>?")]
 //   XCTAssertEqual(diffs,
 //       ((Patch *)[[dmp patch_fromText:"@@ -1,21 +1,21 @@\n-%601234567890-=%5B%5D%5C;',./\n+~!@#$%25%5E&*()_+%7B%7D%7C:%22%3C%3E?\n" error:NULL] objectAtIndex:0]).diffs,
 //       "patch_fromText: Character decoding.")
@@ -1100,7 +1100,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //
 // func test_patch_splitMax() {
 //   // Assumes that Match_MaxBits is 32.
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //   NSMutableArray *patches;
 //
 //   patches = [dmp patch_makeFromOldString:"abcdefghijklmnopqrstuvwxyz01234567890", andNewString:"XabXcdXefXghXijXklXmnXopXqrXstXuvXwxXyzX01X23X45X67X89X0")
@@ -1124,7 +1124,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_patch_addPadding() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   NSMutableArray *patches;
 //   patches = [dmp patch_makeFromOldString:"", andNewString:"test")
@@ -1158,7 +1158,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // func test_patch_apply() {
-//   let dmp = DiffMatchPatch()
+//   let dmp = __DiffMatchPatch()
 //
 //   dmp.Match_Distance = 1000;
 //   dmp.Match_Threshold = 0.5f;
@@ -1248,19 +1248,19 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // }
 //
 // - (void)test_diff_nscoding {
-//     Diff *orig = [Diff new];
+//     __Diff *orig = [__Diff new];
 //     orig.operation = .diffEqual;
 //     orig.text = @"foo";
 //     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:orig];
 //     XCTAssertNotNil(data);
-//     Diff *res = [NSKeyedUnarchiver unarchiveObjectWithData:data];
+//     __Diff *res = [NSKeyedUnarchiver unarchiveObjectWithData:data];
 //     XCTAssertNotNil(res);
 //     XCTAssertEqual(res.operation, .diffEqual);
 //     XCTAssertEqual(res.text, @"foo");
 // }
 //
 // - (void)test_patch_nscoding {
-//     Diff *diff = [Diff new];
+//     __Diff *diff = [__Diff new];
 //     diff.operation = .diffEqual;
 //     diff.text = @"foo";
 //
@@ -1292,7 +1292,7 @@ class InternalDiffMatchPatchTests: XCTestCase {
 // - (NSArray *)diff_rebuildtexts:(NSMutableArray *)diffs;
 // {
 //   NSArray *text = [[NSMutableString string], [NSMutableString string]]
-//   for (Diff *myDiff in diffs) {
+//   for (__Diff *myDiff in diffs) {
 //     if (myDiff.operation != .diffInsert) {
 //       [[text objectAtIndex:0] appendString:myDiff.text];
 //     }
@@ -1305,4 +1305,4 @@ class InternalDiffMatchPatchTests: XCTestCase {
 //
 // @end
 
-}
+//}

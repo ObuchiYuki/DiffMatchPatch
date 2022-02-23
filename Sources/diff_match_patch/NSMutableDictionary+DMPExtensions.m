@@ -27,30 +27,83 @@
 
 @implementation NSMutableDictionary (DMPExtensions)
 
-- (void)diff_setIntegerValue:(NSInteger)anInteger forKey:(id)aKey
+- (id)diff_objectForIntegerKey:(NSInteger)keyInteger;
 {
-  self[aKey] = @(anInteger);
+  return [self objectForKey:[NSNumber numberWithInteger:keyInteger]];
 }
 
-- (void)diff_setIntegerValue:(NSInteger)anInteger forIntegerKey:(NSInteger)keyInteger
+- (id)diff_objectForUnsignedIntegerKey:(NSUInteger)keyUInteger;
 {
-  self[@(keyInteger)] = @(anInteger);
+  return [self objectForKey:[NSNumber numberWithUnsignedInteger:keyUInteger]];
+}
+
+- (id)diff_objectForUnicharKey:(unichar)aUnicharKey;
+{
+  return [self objectForKey:[NSString diff_stringFromUnichar:aUnicharKey]];
 }
 
 
-- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forKey:(id)aKey
+- (NSInteger)diff_integerForKey:(id)aKey;
 {
-  self[aKey] = @(anUInteger);
+  return [((NSNumber *)[self objectForKey:aKey]) integerValue];
 }
 
-- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forUnsignedIntegerKey:(NSUInteger)keyUInteger
+- (NSUInteger)diff_unsignedIntegerForKey:(id)aKey;
 {
-  self[@(keyUInteger)] = @(anUInteger);
+  return [((NSNumber *)[self objectForKey:aKey]) unsignedIntegerValue];
 }
 
-- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forUnicharKey:(unichar)aUnicharKey
+- (NSInteger)diff_integerForIntegerKey:(NSInteger)keyInteger;
 {
-  self[[NSString diff_stringFromUnichar:aUnicharKey]] = @(anUInteger);
+  return [((NSNumber *)[self objectForKey:[NSNumber numberWithInteger:keyInteger]]) integerValue];
+}
+
+- (NSUInteger)diff_unsignedIntegerForUnicharKey:(unichar)aUnicharKey;
+{
+  return [((NSNumber *)[self diff_objectForUnicharKey:aUnicharKey]) unsignedIntegerValue];
+}
+
+
+- (BOOL)diff_containsObjectForKey:(id)aKey;
+{
+  return ([self objectForKey:aKey] != nil);
+}
+
+- (BOOL)containsObjectForIntegerKey:(NSInteger)keyInteger;
+{
+  return ([self objectForKey:[NSNumber numberWithInteger:keyInteger]] != nil);
+}
+
+- (BOOL)diff_containsObjectForUnicharKey:(unichar)aUnicharKey;
+{
+  return ([self diff_objectForUnicharKey:aUnicharKey] != nil);
+}
+
+
+- (void)diff_setIntegerValue:(NSInteger)anInteger forKey:(id)aKey;
+{
+  [self setObject:[NSNumber numberWithInteger:anInteger] forKey:aKey];
+}
+
+- (void)diff_setIntegerValue:(NSInteger)anInteger forIntegerKey:(NSInteger)keyInteger;
+{
+  [self setObject:[NSNumber numberWithInteger:anInteger] forKey:[NSNumber numberWithInteger:keyInteger]];
+}
+
+
+- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forKey:(id)aKey;
+{
+  [self setObject:[NSNumber numberWithUnsignedInteger:anUInteger] forKey:aKey];
+}
+
+- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forUnsignedIntegerKey:(NSUInteger)keyUInteger;
+{
+  [self setObject:[NSNumber numberWithUnsignedInteger:anUInteger] forKey:[NSNumber numberWithUnsignedInteger:keyUInteger]];
+}
+
+- (void)diff_setUnsignedIntegerValue:(NSUInteger)anUInteger forUnicharKey:(unichar)aUnicharKey;
+{
+  [self setObject:[NSNumber numberWithUnsignedInteger:anUInteger] forKey:[NSString diff_stringFromUnichar:aUnicharKey]];
 }
 
 @end
